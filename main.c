@@ -1,24 +1,34 @@
 #include<reg52.h>
 #include<stdio.h>
-#include<absacc.h>
+#include<absacc.h>              //for external memory functions
 
 #define BAUDRATE 0xF4          //2400 baud rate
 
-void UART_Init(void);
+
 unsigned char UART_Receive();
 void UART_Transmit(unsigned char serialdata);
 void delay(unsigned int t);
-
+void addSample(float value);
+	
+unsigned int counter=0;
+static int counter_prev=0;
 
 
 void main()
 {
    unsigned char x,y;    
-        UART_Init();       
+        //UART  Initiation
+        TMOD = 0x22;                            
+        SCON = 0x50;                                      
+        TH1 = BAUDRATE; 
+        TH0 =	0xA4;
+        IE = 0x92;	 
+        TR1 = 1;
+        TR0 = 1;	
         while(1) 
         {
           int i;
-					int counter=0;
+					
 					for(i=0;i<1000;i++)           //recieving from pc
 					{               
 					x=UART_Receive();
@@ -27,6 +37,7 @@ void main()
 					}     
 					
 					counter=0;
+					counter_prev=0;
 					
 					for(i=0;i<1000;i++)           //sending back to pc
 					{               
@@ -38,13 +49,44 @@ void main()
         }
 }
 
-void UART_Init(void)                    // INITIALIZE SERIAL PORT
-{
-        TMOD = 0x20;                            // Timer 1 IN MODE 2 -AUTO RELOAD TO GENERATE BAUD RATE
-        SCON = 0x50;                                      // SERIAL MODE 1, 8-DATA BIT 1-START BIT, 1-STOP BIT, REN ENABLED
-        TH1 = BAUDRATE;                        // LOAD BAUDRATE TO TIMER REGISTER
-        TR1 = 1;                                    // START TIMER
+void addSample(float value) {
+  double xdata sampleData[1024];
+int nextSlot = 0;
+double averageBR; 
+	
+	double sum = 0;
+   int i;
+   sampleData[nextSlot] = value;
+   nextSlot++;
+   if(nextSlot >= 1024) {
+		 nextSlot = 0;
+	 }
+   for( i = 0; i < 1024; i++) 
+	{
+		sum += sampleData[1024];
+  }
+	averageBR = sum/1024;
 }
+
+void timer0() interrupt 1
+{
+  
+	 static int count=0;	
+   
+	if(count>10000)                   //baud rate calculation every second
+	{
+    
+		float rate = counter-counter_prev;	 
+		addSample(rate);
+		counter_prev=counter;
+		count=0;
+	}
+	else
+	{
+  count++;	
+	}
+}
+
 void UART_Transmit(unsigned char serialdata)
 {
         SBUF = serialdata;                                   // LOAD DATA TO SERIAL BUFFER REGISTER
@@ -57,3 +99,4 @@ unsigned char UART_Receive()
          RI=0;    
          return SBUF;       
 }
+
