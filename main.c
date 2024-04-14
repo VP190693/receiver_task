@@ -12,7 +12,8 @@ void addSample(float value);
 	
 unsigned int counter=0;
 static int counter_prev=0;
-
+float rate;
+double averageBR;
 
 void main()
 {
@@ -32,6 +33,8 @@ void main()
 					for(i=0;i<1000;i++)           //recieving from pc
 					{               
 					x=UART_Receive();
+						rate=(counter-counter_prev);
+						addSample(rate);
 						counter += 1;
 						XBYTE[i]=x;
 					}     
@@ -52,7 +55,7 @@ void main()
 void addSample(float value) {
   double xdata sampleData[1024];
 int nextSlot = 0;
-double averageBR; 
+ 
 	
 	double sum = 0;
    int i;
@@ -76,8 +79,8 @@ void timer0() interrupt 1
 	if(count>10000)                   //baud rate calculation every second
 	{
     
-		float rate = counter-counter_prev;	 
-		addSample(rate);
+		printf("BR = %lf",averageBR);	 
+		
 		counter_prev=counter;
 		count=0;
 	}
