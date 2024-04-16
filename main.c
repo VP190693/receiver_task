@@ -1,16 +1,14 @@
 #include<reg52.h>
-#include<stdio.h>
-#include<absacc.h>              //for external memory functions
+
 #include"I2C.h"
 #include"delay.h"
 
-#define BAUDRATE 0xF4          //2400 baud rate
 
 
-unsigned char UART_Receive();
-void UART_Transmit(unsigned char serialdata);
-void delay(unsigned int t);
-void addSample(float value);
+void UsartConfiguration();
+
+
+void addSample(unsigned int value);
 void print_BR(void);
 unsigned char EepromReadByte(unsigned char Address,unsigned char Page);
 void EepromWriteByte( unsigned char Data,unsigned char Address, unsigned char Page);
@@ -18,20 +16,19 @@ void EepromWriteByte( unsigned char Data,unsigned char Address, unsigned char Pa
 
 unsigned int counter=0;
 static int counter_prev=0; 
-float rate;
-double averageBR;
+unsigned int rate;
+unsigned int averageBR;
+unsigned char data_to_send;
+	unsigned char receiveData;
 
 void main()
 {
    unsigned char x,y;    
         //UART  Initiation
-        
-	TMOD = 0x22;                            
-        SCON = 0x50;                                      
-        TH1 = BAUDRATE; 
+     UsartConfiguration();   
+	       
         TH0 =	0xA4;
         IE = 0x92;	 
-        TR1 = 1;
         TR0 = 1;	
        
 
@@ -41,7 +38,7 @@ void main()
 					
 					for(i=0;i<1024;i++)           //recieving from pc
 					{               
-					x=UART_Receive();
+					   x=receiveData;
 						rate=(counter-counter_prev);
 						addSample(rate);
 						counter += 1;
@@ -54,19 +51,33 @@ void main()
 					for(i=0;i<1024;i++)           //sending back to pc
 					{               
 					 y=EepromReadByte(i,0);
-					 UART_Transmit(y);
+					SBUF=y;
 						counter +=1;
 					}    
 					
         }
 }
 
-void addSample(float value) {
-  double xdata sampleData[1024];
+
+void UsartConfiguration()
+{
+	SCON=0X50;			
+	TMOD=0X22;			
+	PCON=0X80;			
+	TH1=0XF3;				
+	TL1=0XF3;
+	ES=1;						
+	EA=1;						
+	TR1=1;					
+}
+
+
+void addSample(unsigned int value) {
+  unsigned int xdata sampleData[1024];
 int nextSlot = 0;
  
 	
-	double sum = 0;
+	unsigned int sum = 0;
    int i;
    sampleData[nextSlot] = value;
    nextSlot++;
@@ -99,18 +110,6 @@ void timer0() interrupt 1
 	}
 }
 
-void UART_Transmit(unsigned char serialdata)
-{
-        SBUF = serialdata;                                   // LOAD DATA TO SERIAL BUFFER REGISTER
-        while(TI == 0);                                      // WAIT UNTIL TRANSMISSION TO COMPLETE
-        TI = 0;                                                    // CLEAR TRANSMISSION INTERRUPT FLAG
-}
-unsigned char UART_Receive()
-{
-         while(RI==0);
-         RI=0;    
-         return SBUF;       
-}
 
 void print_BR(void)
 	{
@@ -118,16 +117,16 @@ void print_BR(void)
 		unsigned char msg[10];
   unsigned char mes[15] ="Baud rate = ";		
 		
-		           sprintf(msg,"%lf",averageBR);
+		           msg[10]=(unsigned char)averageBR;
 		               for(i=0;i<15;i++)
 		{
-				           UART_Transmit(mes[i]);
-
+				         SBUF=mes[i];
+while(!TI);
 		}      
-		          for(i=0;i<10;i++)
+		         for(i=0;i<10;i++)
 		{
-				           UART_Transmit(msg[i]);
-
+				         SBUF=(msg[i]);
+while(!TI);
 		}
 	}
 
@@ -158,5 +157,17 @@ unsigned char EepromReadByte(unsigned char Address,unsigned char Page)
     I2CStop();		        
 	  Delay_us(10);
     return Data;          
+}
+
+void Usart() interrupt 4
+{
+if(TI==1){			 
+	  TI=0;
+	}		
+   else
+	 {
+	 receiveData=SBUF;
+	RI = 0;
+	 }
 }
 
