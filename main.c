@@ -69,8 +69,8 @@ void UsartConfiguration()
 	SCON=0X50;			
 	TMOD=0X20;			
 	PCON=0X80;			
-	TH1=0XF3;				
-	TL1=0XF3;
+	TH1=0XF4;				
+	TL1=0XF4;
 	ES=1;						
 	EA=1;						
 	TR1=1;					
