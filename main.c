@@ -1,8 +1,9 @@
 #include<reg52.h>
-
+#include<stdlib.h>
 #include"I2C.h"
 #include"delay.h"
-
+#include<stdio.h>
+#include<math.h>
 
 
 void UsartConfiguration();
@@ -12,7 +13,7 @@ void addSample(unsigned int value);
 void print_BR(void);
 unsigned char EepromReadByte(unsigned char Address,unsigned char Page);
 void EepromWriteByte( unsigned char Data,unsigned char Address, unsigned char Page);
-
+char* itoa(int num, char* buffer, int base);
 
 unsigned int counter=0;
 static int counter_prev=0; 
@@ -25,36 +26,40 @@ void main()
 {
    unsigned char x,y;    
         //UART  Initiation
-     UsartConfiguration();   
-	       
-        TH0 =	0xA4;
+    unsigned int i;
+					    
+	       UsartConfiguration();
+         TH0 =	0xA4;
         IE = 0x92;	 
         TR0 = 1;	
-       
+       PT0=0;
 
-	while(1) 
-        {
-         unsigned int i;
-					
 					for(i=0;i<1024;i++)           //recieving from pc
 					{               
-					   x=receiveData;
+					   
+						x=receiveData;
 						rate=(counter-counter_prev);
 						addSample(rate);
 						counter += 1;
-						EepromWriteByte(x,i,0);
-					}     
-					
-					counter=0;
+						EepromWriteByte(x,i,1);
+					  
+					}
+counter=0;
 					counter_prev=0;
-					
-					for(i=0;i<1024;i++)           //sending back to pc
+
+						for(i=0;i<1024;i++)           //sending back to pc
 					{               
-					 y=EepromReadByte(i,0);
-					SBUF=y;
-						counter +=1;
-					}    
 					
+						y=EepromReadByte(i,1);
+					SBUF=y;
+					while(!TI);
+		       TI=0;	
+						counter +=1;
+					}   
+					
+	while(1) 
+        {
+         
         }
 }
 
@@ -62,7 +67,7 @@ void main()
 void UsartConfiguration()
 {
 	SCON=0X50;			
-	TMOD=0X22;			
+	TMOD=0X20;			
 	PCON=0X80;			
 	TH1=0XF3;				
 	TL1=0XF3;
@@ -73,7 +78,7 @@ void UsartConfiguration()
 
 
 void addSample(unsigned int value) {
-  unsigned int xdata sampleData[1024];
+  unsigned int xdata sampleData[50];
 int nextSlot = 0;
  
 	
@@ -81,14 +86,14 @@ int nextSlot = 0;
    int i;
    sampleData[nextSlot] = value;
    nextSlot++;
-   if(nextSlot >= 1024) {
+   if(nextSlot >= 50) {
 		 nextSlot = 0;
 	 }
-   for( i = 0; i < 1024; i++) 
+   for( i = 0; i < 50; i++) 
 	{
-		sum += sampleData[1024];
+		sum += sampleData[50];
   }
-	averageBR = sum/1024;
+	averageBR = sum/50;
 }
 
 void timer0() interrupt 1
@@ -113,21 +118,27 @@ void timer0() interrupt 1
 
 void print_BR(void)
 	{
-	int i;	
+	
+		int i;	
 		unsigned char msg[10];
   unsigned char mes[15] ="Baud rate = ";		
 		
-		           msg[10]=(unsigned char)averageBR;
-		               for(i=0;i<15;i++)
+		           itoa(averageBR,msg,10);
+UsartConfiguration();		 
+		for(i=0;i<15;i++)
 		{
 				         SBUF=mes[i];
 while(!TI);
+			TI=0;
 		}      
 		         for(i=0;i<10;i++)
 		{
 				         SBUF=(msg[i]);
 while(!TI);
+		TI=0;
 		}
+	
+		
 	}
 
 void EepromWriteByte( unsigned char Data,unsigned char Address, unsigned char Page)
@@ -161,13 +172,45 @@ unsigned char EepromReadByte(unsigned char Address,unsigned char Page)
 
 void Usart() interrupt 4
 {
-if(TI==1){			 
-	  TI=0;
-	}		
-   else
-	 {
-	 receiveData=SBUF;
-	RI = 0;
-	 }
-}
+ 	
+ 
+	receiveData=SBUF;
+	 RI = 0;
+	 
+	 //SBUF='*';
+	      
+		}
 
+char* itoa(int num, char* buffer, int base)   
+{  
+int current = 0;  
+unsigned int num_digits = 0;
+	if (num == 0) {  
+buffer[current++] = '0';  
+buffer[current] = '\0';  
+return buffer;  
+}  
+  
+if (num < 0) {  
+if (base == 10) {  
+num_digits ++;  
+buffer[current] = '-';  
+current ++;  
+num *= -1;  
+}  
+else  
+return NULL;  
+}  
+num_digits += (int)floor(log(num) / log(base)) + 1;  
+while (current < num_digits)   
+{  
+int base_val = (int) pow(base, num_digits-1-current);  
+int num_val = num / base_val;  
+ char value = num_val + '0';  
+buffer[current] = value;  
+current ++;  
+num -= base_val * num_val;  
+}  
+buffer[current] = '\0';  
+return buffer;  
+}  
